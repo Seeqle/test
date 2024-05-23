@@ -5,28 +5,19 @@ import Google from "next-auth/providers/google";
 import EmailProvider from "next-auth/providers/email";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from 'bcrypt';
-import Link from 'next/link'
 
+import Stripe  from "stripe";
 
-import compare from 'bcrypt';
-import credentials from "next-auth/providers/credentials";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    typescript: true,
+    apiVersion: "2024-04-10",
+}
+);
+
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
     adapter: PrismaAdapter(prisma),
     providers: [
-        EmailProvider({
-            from: process.env.EMAIL_FROM,
-            server: {
-                host: process.env.EMAIL_SERVER_HOST,
-                port: process.env.EMAIL_SERVER_PORT,
-                auth: {
-                    user: process.env.EMAIL_SERVER_USER,
-                    pass: process.env.EMAIL_SERVER_PASSWORD
-                }
-            }
-        }),
-        Google({ clientId: process.env.AUTH_GOOGLE_ID, clientSecret: process.env.AUTH_GOOGLE_SECRET }),
-
         CredentialsProvider({
             name: "Credentials",
             credentials: {
@@ -64,14 +55,65 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
                 return user;
             }
-        })
-        
+        }),
+        EmailProvider({
+            from: process.env.EMAIL_FROM,
+            server: {
+                host: process.env.EMAIL_SERVER_HOST,
+                port: process.env.EMAIL_SERVER_PORT,
+                auth: {
+                    user: process.env.EMAIL_SERVER_USER,
+                    pass: process.env.EMAIL_SERVER_PASSWORD
+                }
+            }
+        }),
+        Google({ clientId: process.env.AUTH_GOOGLE_ID, clientSecret: process.env.AUTH_GOOGLE_SECRET }),
+
+
     ],
     session: {
         strategy: "jwt",
     },
+    events: {
+        signIn: async ( message ) => {
+            const userId = message.user.id;
+            const email = message.user.email;
+            const name = message.user.name;
+
+
+            if (!userId || !email) {
+                console.error('Email is required to create a Stripe customer');
+                return;
+            }
+            
+            // autres méthode
+            // const customer = await stripe.customers.create({
+            //     email,
+            //     name: name ?? undefined,
+            // });
+            // await prisma.user.update({
+            //     where: { id: userId },
+            //     data: { stripeCustomerId: customer.id }
+            // });
+
+            try {
+                const existingUser = await prisma.user.findUnique({ where: { email: email} });
+                if (!existingUser?.stripeCustomerId) {
+                    const customer = await stripe.customers.create({
+                        email,
+                        name: name ?? undefined,
+                     });
+                    await prisma.user.update({
+                        where: { id: userId },
+                        data: { stripeCustomerId: customer.id }
+                    });
+                }
+            } catch (error) {
+                console.error('Error creating Stripe customer:', error);
+            }
+        }
+    },
     secret: process.env.SECRET_KEY,
- 
 
 });
 
