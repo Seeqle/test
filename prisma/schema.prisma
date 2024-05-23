@@ -17,12 +17,20 @@ model User {
   accounts      Account[]
   sessions      Session[]
 
+  plan          UserPlan @default(STARTER)
+
   // Optional for WebAuthn support
   Authenticator Authenticator[]
  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   stripeCustomerId String?
+}
+
+enum UserPlan {
+  STARTER
+  PRO
+  ENTREPRISE
 }
  
 model Account {

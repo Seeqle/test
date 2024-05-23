@@ -86,23 +86,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 return;
             }
             
-            // autres méthode
-            // const customer = await stripe.customers.create({
-            //     email,
-            //     name: name ?? undefined,
-            // });
-            // await prisma.user.update({
-            //     where: { id: userId },
-            //     data: { stripeCustomerId: customer.id }
-            // });
-
+            
             try {
                 const existingUser = await prisma.user.findUnique({ where: { email: email} });
                 if (!existingUser?.stripeCustomerId) {
                     const customer = await stripe.customers.create({
                         email,
                         name: name ?? undefined,
-                     });
+                    });
                     await prisma.user.update({
                         where: { id: userId },
                         data: { stripeCustomerId: customer.id }
@@ -111,6 +102,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             } catch (error) {
                 console.error('Error creating Stripe customer:', error);
             }
+            // autres méthode qui ne vérifie pas si l'user existe déjà dans stripe
+            // const customer = await stripe.customers.create({
+            //     email,
+            //     name: name ?? undefined,
+            // });
+            // await prisma.user.update({
+            //     where: { id: userId },
+            //     data: { stripeCustomerId: customer.id }
+            // });
         }
     },
     secret: process.env.SECRET_KEY,
